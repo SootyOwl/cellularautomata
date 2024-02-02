@@ -1,0 +1,19 @@
+[tool.poetry]
+name = "cellularautomata"
+version = "0.1.0"
+description = ""
+authors = ["Your Name <you@example.com>"]
+readme = "README.md"
+
+[tool.poetry.scripts]
+run-ca = "cellularautomata.base:main"
+rainbow = "cellularautomata.game:main"
+
+[tool.poetry.dependencies]
+python = "^3.10"
+numpy = "^1.26.3"
+pygame = "^2.5.2"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

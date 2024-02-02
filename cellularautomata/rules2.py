@@ -1,0 +1,275 @@
+import itertools
+from collections import Counter
+import random
+import colorsys
+
+class Rules:
+    def __init__(self):
+        self.default_state = 0
+        self.rules = {}
+        self.possible_states = [0]
+
+    def add_rule(self, configuration: str, result_state):
+        self.rules[configuration] = result_state
+
+    def apply(self, grid, position: tuple):
+        configuration = self.get_configuration(grid, position)
+        return self.rules.get(configuration, self.default_state)
+
+    def get_configuration(self, grid, position) -> str:
+        raise NotImplementedError("This method should provide the encoded configuration for the current grid and position.")
+
+    def get_state_color(self, state):
+        raise NotImplementedError("This method should provide the color representation for a given state.")
+
+class GameOfLifeRules(Rules):
+    def __init__(self):
+        super().__init__()
+        self.color_map = {
+            0: (0, 0, 0),  # Dead / Empty
+            1: (0, 255, 0),  # Alive / State 1
+            # Add more states as needed
+        }
+        self.possible_states = [0, 1]
+        # Add specific rules here, for example (Game of Life):
+        # a dead cell comes to life with 3 neighbors
+        self.add_rule("011100000", 1)  
+        # a living cell survives if it has 2 or 3 neighbors
+        self.add_rule("111000000", 1)  
+        self.add_rule("111100000", 1)
+
+    def get_configuration(self, grid, position) -> int:
+        """Game of Life configuration, counting the number of living cells in the 8
+        positions around the cell."""
+        i, j = position
+        state = grid[i][j]
+        alive_neighbors = self.count_alive_neighbors(grid, i, j)
+        return f"{state}{'1' * alive_neighbors}".ljust(9, "0")
+
+    @staticmethod
+    def count_alive_neighbors(grid, x, y):
+        rows = len(grid)
+        cols = len(grid[0])
+        sum = 0
+        for i in range(-1, 2):
+            for j in range(-1, 2):
+                if i == 0 and j == 0:
+                    continue
+                nx, ny = (x + i) % rows, (y + j) % cols
+                sum += grid[nx][ny]
+        return sum
+
+    def get_state_color(self, state):
+        return self.color_map.get(state, (255, 255, 255))  # Default to white if state is undefined
+
+
+
+class TripleLife(Rules):
+    """3 state, 8 neigbors"""
+
+    def __init__(self):
+        super().__init__()
+        self.possible_states = [0, 1, 2]
+        """Possible states for the cells."""
+
+        self.alive_states = [1, 2]
+        """States that are considered alive."""
+
+        self.placeholder = "*"
+        """Placeholder for any alive state."""
+
+        ## Add specific rules here
+        # a dead cell comes to life with 3 neighbors of any state
+        self.add_rule("000000***", 1, placeholder_alive_only=True)
+        self.add_rule("00000****", 2, placeholder_alive_only=True)
+        # a living cell survives if it has 2 or 3 neighbors of any alive state, favoring the current state
+        self.add_rule("100000*11", 1, placeholder_alive_only=True)
+        self.add_rule("100000011", 1, placeholder_alive_only=True)
+        self.add_rule("200000*22", 2, placeholder_alive_only=True)
+        self.add_rule("200000022", 2, placeholder_alive_only=True)
+
+
+    def get_configuration(self, grid, position) -> str:
+        i, j = position
+        state = grid[i][j]
+        neighbors = self.get_neighbors(grid, position)
+        # sort the neighbors so that the configuration is consistent
+        neighbors.sort()
+        neighbors = "".join(map(str, neighbors)).ljust(8, self.placeholder)
+        return f"{state}{neighbors}"
+    
+
+    def add_rule(self, configuration: str, result_state, placeholder_alive_only=False, placeholder_dead_only=False):
+        """Override the add_rule method to allow placeholder '*' for any state."""
+        if self.placeholder not in configuration:
+            super().add_rule(configuration, result_state)
+            return
+        
+        # get the number of placeholders
+        n = configuration.count(self.placeholder)
+        # generate all possible combinations of states for the placeholders
+        # order does not matter as the configuration is sorted
+        placeholder_states = (self.alive_states if placeholder_alive_only else self.possible_states) if not placeholder_dead_only else [0]
+        combinations = itertools.combinations_with_replacement(placeholder_states, n)
+        for combination in combinations:
+            c = configuration
+            # replace the placeholders with the states
+            for s in combination:
+                c = c.replace(self.placeholder, str(s), 1)
+            # sort the configuration so that it is consistent
+            c = c[:1] + "".join(sorted(c[1:]))
+            super().add_rule(c, result_state)
+        
+
+    def get_neighbors(self, grid, position):
+        rows = len(grid)
+        cols = len(grid[0])
+        i, j = position
+        neighbors = []
+        # iterate over the 8 neighbors accounting for the grid wrapping
+        for x in range(-1, 2):
+            for y in range(-1, 2):
+                if x == 0 and y == 0:
+                    continue
+                nx, ny = (i + x) % rows, (j + y) % cols
+                neighbors.append(grid[nx][ny])
+
+        return neighbors
+        
+    def get_state_color(self, state):
+        if state == 1:
+            return (0, 255, 0)
+        elif state == 2:
+            return (0, 0, 255)
+        else:
+            return (0, 0, 0)
+
+
+
+class ElementaryCellularAutomata(Rules):
+    def __init__(self, rule_number):
+        super().__init__()
+        self.rule_number = rule_number
+        self.possible_states = [0, 1]
+        self.rules = self.generate_rules(rule_number)
+        self.color_map = {
+            0: (0, 0, 0),
+            1: (255, 255, 255)
+        }
+
+    def generate_rules(self, rule_number):
+        rules = {}
+        for i in range(7, -1, -1):
+            rules[format(i, "03b")] = (rule_number >> i) & 1
+        return rules
+
+    def get_configuration(self, grid, position) -> str:
+        i, j = position
+        rows = len(grid)
+        cols = len(grid[0])
+        left = grid[i][(j - 1) % cols]
+        center = grid[i][j]
+        right = grid[i][(j + 1) % cols]
+        return f"{left}{center}{right}"
+
+    def get_state_color(self, state):
+        return self.color_map.get(state, (255, 255, 255))  # Default to white if state is undefined
+    
+
+class Rainbow(Rules):
+    """Ruleset that cycles through the colors of the rainbow."""
+    def __init__(self):
+        super().__init__()
+        self.colors = [
+            (255, 0, 0),  # Red
+            (255, 127, 0),  # Orange
+            (255, 255, 0),  # Yellow
+            (0, 255, 0),  # Green
+            (0, 0, 255),  # Blue
+            (75, 0, 130),  # Indigo
+            (143, 0, 255)  # Violet
+        ]
+        self.possible_states = [i for i in range(len(self.colors))]
+        self.color_map = {i: self.colors[i] for i in range(len(self.colors))}
+        self.rules = self.generate_rules()
+
+    def generate_rules(self):
+        """Define rules where red transitions to orange, orange to yellow, etc.
+        and violet transitions to red."""
+        rules = {}
+        for i in range(len(self.colors)):
+            rules[i] = (i + 1) % len(self.colors)
+        return rules
+        
+    def get_configuration(self, grid, position) -> int:
+        return grid[position[0]][position[1]]
+
+    def get_state_color(self, state):
+        return self.color_map.get(state, (255, 255, 255))  # Default to white if state is undefined
+    
+
+class RainbowLife(Rules):
+    """Each color represents a different state, and the rules allow for transitions between the colors."""
+    def __init__(self, num_states=7, pastel=False, scroll=False):
+        super().__init__()
+        self.colors = self.generate_colors(num_states, pastel=pastel)
+        self.possible_states = [i for i in range(len(self.colors))]
+        self.color_map = {i: self.colors[i] for i in range(len(self.colors))}
+        self.rules = self.generate_rules(scroll=scroll)
+
+    def generate_colors(self, num_states, pastel=False):
+        """Generate a list of colors that cycle through the color wheel.
+        If pastel is True, the colors are desaturated."""
+        colors = []
+        # set the starting hue to 0 for red
+        start_hue = 0
+        for i in range(num_states):
+            h = (start_hue + i / num_states) % 1
+            s = 0.75 if pastel else 1
+            v = 1
+            r, g, b = colorsys.hsv_to_rgb(h, s, v)
+            colors.append((int(r * 255), int(g * 255), int(b * 255)))
+        return colors
+
+    def generate_rules(self, scroll=False):
+        rules = {}
+        for i in range(len(self.colors)):
+            rules[i] = i if not scroll else (i + 1) % len(self.colors)
+        return rules
+
+    def get_configuration(self, grid, position) -> int:
+        i, j = position
+        neighbors = self.get_neighbors(grid, position)
+        state = grid[i][j]
+        # If I'm the same color as all my neighbors, I change to the next color
+        # "Nonconformity is the only legitimate form of rebellion."
+        if all(n == state for n in neighbors):
+            return (state + 1) % len(self.colors)
+        # If I'm different from all my neighbors, I change to the most common color among them
+        # "When in Rome, do as the Romans do."
+        if Counter(neighbors)[state] == 0:
+            return max(set(neighbors), key=neighbors.count)
+        # otherwise, I choose an random neighbor to imitate, favoring the most common colors
+        # "Imitation is the sincerest form of flattery."
+        return random.choices(
+            neighbors, 
+            weights=[neighbors.count(n) for n in neighbors], 
+            k=1)[0]
+
+    def get_neighbors(self, grid, position):
+        rows = len(grid)
+        cols = len(grid[0])
+        i, j = position
+        neighbors = []
+        # iterate over the 8 neighbors accounting for the grid wrapping
+        for x in range(-1, 2):
+            for y in range(-1, 2):
+                if x == 0 and y == 0:
+                    continue
+                nx, ny = (i + x) % rows, (j + y) % cols
+                neighbors.append(grid[nx][ny])
+
+        return neighbors
+    
+    def get_state_color(self, state):
+        return self.color_map.get(state, (255, 255, 255))  # Default to white if state is undefined
