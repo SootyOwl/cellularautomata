@@ -1,7 +1,9 @@
+from functools import lru_cache
 import itertools
 from collections import Counter
 import random
 import colorsys
+import numpy as np
 
 class Rules:
     def __init__(self):
@@ -213,19 +215,24 @@ class RainbowLife(Rules):
     def __init__(self, num_states=7, pastel=False, scroll=False):
         super().__init__()
         self.colors = self.generate_colors(num_states, pastel=pastel)
+        self.num_states = num_states
         self.possible_states = [i for i in range(len(self.colors))]
         self.color_map = {i: self.colors[i] for i in range(len(self.colors))}
         self.rules = self.generate_rules(scroll=scroll)
 
-    def generate_colors(self, num_states, pastel=False):
+    def generate_colors(self, num_states, pastel=False, random_start=True):
         """Generate a list of colors that cycle through the color wheel.
-        If pastel is True, the colors are desaturated."""
+        If pastel is True, the colors are desaturated.
+        If random_start is True, the colors start at a random hue, otherwise they start at red."""
+        if random_start:
+            start_hue = random.random()
+        else:
+            start_hue = 0
+
         colors = []
-        # set the starting hue to 0 for red
-        start_hue = 0
         for i in range(num_states):
             h = (start_hue + i / num_states) % 1
-            s = 0.75 if pastel else 1
+            s = 0.5 if pastel else 1
             v = 1
             r, g, b = colorsys.hsv_to_rgb(h, s, v)
             colors.append((int(r * 255), int(g * 255), int(b * 255)))
@@ -241,6 +248,68 @@ class RainbowLife(Rules):
         i, j = position
         neighbors = self.get_neighbors(grid, position)
         state = grid[i][j]
+        return self.get_next_state(state, neighbors, self.num_states)
+    
+    def get_next_state(self, state: int, neighbors: tuple, num_states: int):
+        # If I'm the same color as all my neighbors, I change color
+        # "Nonconformity is the only legitimate form of rebellion."
+        if self._nonconformity(state, neighbors):
+            return (state + 1) % num_states
+        # If I'm different from all my neighbors, I change to the most common color among them
+        # "When in Rome, do as the Romans do."
+        if self._different(state, neighbors):
+            return max(set(neighbors), key=neighbors.count)
+        # otherwise, I choose an random neighbor to imitate
+        # "Imitation is the sincerest form of flattery."
+        weights = self._get_neighbor_weights(neighbors)
+        return random.choices(
+            neighbors,
+            weights=weights,
+            k=1)[0]
+    
+    @staticmethod
+    @lru_cache(maxsize=None)
+    def _nonconformity(state, neighbors):
+        if all(n == state for n in neighbors):
+            return True
+        return False
+    
+    @staticmethod
+    @lru_cache(maxsize=None)
+    def _different(state, neighbors):
+        if state not in neighbors:
+            return True
+        return False    
+    
+    @staticmethod
+    @lru_cache(maxsize=None)
+    def _get_neighbor_weights(neighbors):
+        return [neighbors.count(n) for n in neighbors]
+
+    def get_neighbors(self, grid, position) -> tuple:
+        i, j = position
+        rows = len(grid)
+        cols = len(grid[0])
+        neighbors = []
+        for x in range(-1, 2):
+            for y in range(-1, 2):
+                if x == 0 and y == 0:
+                    continue
+                nx, ny = (i + x) % rows, (j + y) % cols
+                neighbors.append(grid[nx][ny])
+        # sort the neighbors so that the configuration is consistent
+        neighbors.sort()
+        return tuple(neighbors)
+    
+    def get_state_color(self, state):
+        return self.color_map.get(state, (255, 255, 255))  # Default to white if state is undefined
+    
+
+class RainbowLife2(RainbowLife):
+    def get_configuration(self, grid, position) -> int:
+        i, j = position
+        neighbors = self.get_neighbors(grid, position)
+        state = grid[i][j]
         # If I'm the same color as all my neighbors, I change to the next color
         # "Nonconformity is the only legitimate form of rebellion."
         if all(n == state for n in neighbors):
@@ -249,27 +318,6 @@ class RainbowLife(Rules):
         # "When in Rome, do as the Romans do."
         if Counter(neighbors)[state] == 0:
             return max(set(neighbors), key=neighbors.count)
-        # otherwise, I choose an random neighbor to imitate, favoring the most common colors
+        # Otherwise, I get closer to the most common color among my neighbors
         # "Imitation is the sincerest form of flattery."
-        return random.choices(
-            neighbors, 
-            weights=[neighbors.count(n) for n in neighbors], 
-            k=1)[0]
-
-    def get_neighbors(self, grid, position):
-        rows = len(grid)
-        cols = len(grid[0])
-        i, j = position
-        neighbors = []
-        # iterate over the 8 neighbors accounting for the grid wrapping
-        for x in range(-1, 2):
-            for y in range(-1, 2):
-                if x == 0 and y == 0:
-                    continue
-                nx, ny = (i + x) % rows, (j + y) % cols
-                neighbors.append(grid[nx][ny])
-
-        return neighbors
-    
-    def get_state_color(self, state):
-        return self.color_map.get(state, (255, 255, 255))  # Default to white if state is undefined
+        return max(set(neighbors), key=neighbors.count)
