@@ -212,6 +212,10 @@ class Rainbow(Rules):
 
 class RainbowLife(Rules):
     """Each color represents a different state, and the rules allow for transitions between the colors."""
+
+    dx = np.array([-1, -1, -1, 0, 0, 1, 1, 1])
+    dy = np.array([-1, 0, 1, -1, 1, -1, 0, 1])
+    
     def __init__(self, num_states=7, pastel=False, scroll=False):
         super().__init__()
         self.colors = self.generate_colors(num_states, pastel=pastel)
@@ -219,6 +223,23 @@ class RainbowLife(Rules):
         self.possible_states = [i for i in range(len(self.colors))]
         self.color_map = {i: self.colors[i] for i in range(len(self.colors))}
         self.rules = self.generate_rules(scroll=scroll)
+
+    def __repr__(self):
+        return f"RainbowLife(num_states={self.num_states})"
+    
+    def __str__(self):
+        return f""""RainbowLife
+
+Rules:
+1. "Nonconformity is the only legitimate form of rebellion"
+2. "When in Rome, do as the Romans do"
+3. "Imitation is the sincerest form of flattery"
+
+Explanation of the rules:
+1. If a cell is the same as its 8 neighbors, it will change to the next colour in the list.
+2. If a cell is different from all its neighbors, it will change to the most common colour among them.
+3. Otherwise, the cell will choose a random neighbour and copy its colour, weighted by the number of neighbours with that colour.
+"""
 
     def generate_colors(self, num_states, pastel=False, random_start=True):
         """Generate a list of colors that cycle through the color wheel.
@@ -232,7 +253,7 @@ class RainbowLife(Rules):
         colors = []
         for i in range(num_states):
             h = (start_hue + i / num_states) % 1
-            s = 0.5 if pastel else 1
+            s = 0.4 if pastel else 1
             v = 1
             r, g, b = colorsys.hsv_to_rgb(h, s, v)
             colors.append((int(r * 255), int(g * 255), int(b * 255)))
@@ -244,80 +265,121 @@ class RainbowLife(Rules):
             rules[i] = i if not scroll else (i + 1) % len(self.colors)
         return rules
 
-    def get_configuration(self, grid, position) -> int:
-        i, j = position
+    def get_configuration(self, grid: np.ndarray, position: tuple) -> int:
         neighbors = self.get_neighbors(grid, position)
-        state = grid[i][j]
-        return self.get_next_state(state, neighbors, self.num_states)
+        state = grid[position]
+        return self.get_next_state(state, neighbors)
     
-    def get_next_state(self, state: int, neighbors: tuple, num_states: int):
+    def get_next_state(self, state: int, neighbors: tuple):
         # If I'm the same color as all my neighbors, I change color
         # "Nonconformity is the only legitimate form of rebellion."
-        if self._nonconformity(state, neighbors):
-            return (state + 1) % num_states
+        neighbor_states = set(neighbors)
+        if neighbor_states == {state}:  # All neighbors are the same color as me
+            return (state + 1) % self.num_states
         # If I'm different from all my neighbors, I change to the most common color among them
         # "When in Rome, do as the Romans do."
         if self._different(state, neighbors):
             return max(set(neighbors), key=neighbors.count)
         # otherwise, I choose an random neighbor to imitate
         # "Imitation is the sincerest form of flattery."
-        weights = self._get_neighbor_weights(neighbors)
-        return random.choices(
-            neighbors,
-            weights=weights,
-            k=1)[0]
-    
+        # use set operations to get the unique neighbors and their weights
+        unique_neighbors, weights = self._get_weights(neighbors)
+        return random.choices(list(unique_neighbors), weights=weights)[0]
+
     @staticmethod
     @lru_cache(maxsize=None)
-    def _nonconformity(state, neighbors):
-        if all(n == state for n in neighbors):
-            return True
-        return False
+    def _get_weights(neighbors):
+        unique_neighbors = set(neighbors)
+        count = Counter(neighbors)
+        weights = [count[n] for n in unique_neighbors]
+        return unique_neighbors, weights
     
     @staticmethod
     @lru_cache(maxsize=None)
     def _different(state, neighbors):
-        if state not in neighbors:
-            return True
-        return False    
+        return set(neighbors) - {state} == set(neighbors)   
     
     @staticmethod
     @lru_cache(maxsize=None)
     def _get_neighbor_weights(neighbors):
-        return [neighbors.count(n) for n in neighbors]
-
-    def get_neighbors(self, grid, position) -> tuple:
-        i, j = position
-        rows = len(grid)
-        cols = len(grid[0])
-        neighbors = []
-        for x in range(-1, 2):
-            for y in range(-1, 2):
-                if x == 0 and y == 0:
-                    continue
-                nx, ny = (i + x) % rows, (j + y) % cols
-                neighbors.append(grid[nx][ny])
+        counter = Counter(neighbors)
+        return [counter[n] for n in neighbors]
+    
+    def get_neighbors(self, grid: np.ndarray, position: tuple) -> tuple:
+        """Extract the 8 neighbors of a cell."""
+        rows, cols = grid.shape
+        nx, ny = self.get_neighbor_positions(position, rows, cols)
+        neighbors = grid[nx, ny]
         # sort the neighbors so that the configuration is consistent
         neighbors.sort()
         return tuple(neighbors)
     
+    @staticmethod
+    @lru_cache(maxsize=None)
+    def get_neighbor_positions(position: tuple, rows, cols) -> tuple:
+        """Get the positions of the 8 neighbors of a cell."""
+        i, j = position
+        return (i + RainbowLife.dx) % rows, (j + RainbowLife.dy) % cols
+    
     def get_state_color(self, state):
         return self.color_map.get(state, (255, 255, 255))  # Default to white if state is undefined
-    
+
+    def get_state_colors(self, grid: np.ndarray):
+        return np.array([[self.get_state_color(state) for state in row] for row in grid])
 
 class RainbowLife2(RainbowLife):
-    def get_configuration(self, grid, position) -> int:
-        i, j = position
-        neighbors = self.get_neighbors(grid, position)
-        state = grid[i][j]
-        # If I'm the same color as all my neighbors, I change to the next color
-        # "Nonconformity is the only legitimate form of rebellion."
-        if all(n == state for n in neighbors):
-            return (state + 1) % len(self.colors)
-        # If I'm different from all my neighbors, I change to the most common color among them
-        # "When in Rome, do as the Romans do."
-        if Counter(neighbors)[state] == 0:
-            return max(set(neighbors), key=neighbors.count)
-        # Otherwise, I get closer to the most common color among my neighbors
-        # "Imitation is the sincerest form of flattery."
-        return max(set(neighbors), key=neighbors.count)
+    """RainbowLife with a different set of principles than the first one."""
+    
+    def __init__(self, equality_threshold=0, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.equality_threshold = equality_threshold
+
+    def __str__(self):
+        return """"RainbowLife 2 - The Reckoning"
+
+Rules:
+"""
+
+    def get_next_state(self, state: int, neighbors: tuple):
+        # Move away from the previous implementation and use the new principles
+
+        # If I'm not the same color as any of my neighbors, I choose the least common color among them
+        if not self._equal_to_any(state, neighbors, self.equality_threshold, self.num_states):
+            return min(set(neighbors), key=neighbors.count)
+        
+        # If I'm the same color as all my neighbors, I change color
+        if self._equal_to_all(state, neighbors, self.equality_threshold, self.num_states):
+            return (state + 1) % self.num_states
+        
+        # Otherwise, I choose the average color of my neighbors
+        return self._average_state(neighbors)
+        
+
+    @staticmethod
+    @lru_cache(maxsize=None)
+    def _get_equals(state, equality_threshold, num_states):
+        """Calculate the states considered equal to the current state based on the equality_threshold."""
+        equals = []
+        if equality_threshold == 0 or equality_threshold == 1:
+            return [state]
+        for i in range(-equality_threshold, equality_threshold + 1):
+            equals.append((state + i) % num_states)
+        return equals
+    
+    @staticmethod
+    @lru_cache(maxsize=None)
+    def _equal_to_any(state, neighbors, equality_threshold, num_states):
+        equals = RainbowLife2._get_equals(state, equality_threshold, num_states)
+        return any(n in equals for n in neighbors)
+    
+    @staticmethod
+    @lru_cache(maxsize=None)
+    def _equal_to_all(state, neighbors, equality_threshold, num_states):
+        equals = RainbowLife2._get_equals(state, equality_threshold, num_states)
+        return all(n in equals for n in neighbors)
+    
+    @staticmethod
+    @lru_cache(maxsize=None)
+    def _average_state(neighbors):
+        """Calculate the average state of the neighbors."""
+        return sum(neighbors) // len(neighbors)

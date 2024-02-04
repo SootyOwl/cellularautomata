@@ -1,6 +1,7 @@
+import time
 import pygame
 from cellularautomata.ca import CellularAutomata
-from cellularautomata.rules2 import RainbowLife
+from cellularautomata.rules2 import RainbowLife, RainbowLife2
 import cv2
 import numpy as np
 
@@ -11,15 +12,11 @@ class PygameRenderer:
         self.cell_positions = [(j * self.cell_size, i * self.cell_size) for i in range(height) for j in range(width)]
 
     def draw(self, win, ca):
-        # state_colors = [ca.rules.get_state_color(ca.grid[i, j]) for i in range(ca.rows) for j in range(ca.cols)]
-        # cells = [(pos, color) for pos, color in zip(self.cell_positions, state_colors)]
-        # for pos, color in cells:
-        #     pygame.draw.rect(win, color, (pos[0], pos[1], self.cell_size, self.cell_size))
-        state_colors = np.array([ca.rules.get_state_color(ca.grid[i, j]) for i in range(ca.rows) for j in range(ca.cols)])
-        # account for cell size 
-        state_colors = state_colors.reshape((ca.rows, ca.cols, 3))
+        grid: np.ndarray = ca.grid
+        state_colors = ca.rules.get_state_colors(grid)
         state_colors = np.repeat(state_colors, self.cell_size, axis=0)
         state_colors = np.repeat(state_colors, self.cell_size, axis=1)
+        # draw the grid
         pygame.surfarray.blit_array(win, state_colors)
 
 # render to mp4 file using opencv
@@ -77,10 +74,6 @@ class GameMP4(Game):
     def run(self):
         try:
             self._run()
-        except Exception as e:
-            print(e)
-            self.renderer.close()
-            pygame.quit()
         finally:
             self.renderer.close()
             pygame.quit()
@@ -91,15 +84,14 @@ class GameMP4(Game):
         while running and total_frames > 0:
             running, total_frames = self._run_one(total_frames)
 
-    def _run_one(self, total_frames, draw=True):
+    def _run_one(self, total_frames):
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 return False, total_frames
         self.ca.update()
-        if draw:
-            self.renderer.draw(self.screen, self.ca)
-            pygame.display.flip()
-            pygame.time.delay(1000 // self.fps)
+        self.renderer.draw(self.screen, self.ca)
+        pygame.display.flip()
+        pygame.time.delay(1000 // self.fps)
         total_frames -= 1
         return True, total_frames
 
@@ -112,14 +104,18 @@ def main():
 
 if __name__ == "__main__":
     width, height = 1000, 1000  # pixels
-    cell_size = 5  # pixels
-    num_states = 8
-    fps = 24
+    # cells per row and column
+    num_cells = width // 20  # pixels per cell
+    cell_size = width // num_cells
+    num_states = 50
+    fps = 30
+    run_seconds = 60
 
-    rules = RainbowLife(
+    rules = RainbowLife2(
         num_states=num_states, 
         pastel=True, 
-        scroll=False
+        scroll=False,
+        equality_threshold=5
     )
     game = GameMP4(
         width=width, 
@@ -127,22 +123,44 @@ if __name__ == "__main__":
         cell_size=cell_size, 
         rules=rules, 
         fps=fps, 
-        run_seconds=60
+        run_seconds=run_seconds
     )
     game.run()
-    # generate a filename from configuration
-    filename = f"rainbowlife_{num_states}_{width}x{height}_{cell_size}px.mp4"
+
+    # pop up a little save y/n dialog box
+    import os
+    if input("Save the video? (y/n): ").lower() != "y":
+        os.remove("output.mp4")
+        exit()
+
+    # generate a filename from configuration and rules class name
+    class_name = rules.__class__.__name__
+    filename = f"{class_name}_{num_states}_{width}x{height}_{cell_size}px__{time.time()}.mp4"
     # rename the output file
     import os
+    # make a directory if it doesn't exist
+    os.makedirs("videos", exist_ok=True)
+    filename = os.path.join("videos", filename)
     os.rename("output.mp4", filename)
-    print(f"Output file: {filename}")
+    # add a summary message
+    print(f"""{str(rules)}
+
+Settings:
+    width: {width}
+    height: {height}
+    cell_size: {cell_size}
+    num_states: {num_states}
+    fps: {fps}
+    run_seconds: {run_seconds}
+    filename: {filename}
+""")
 
     # main()
 
     # from cProfile import Profile
     # from pstats import Stats
-    # rules = RainbowLife(num_states=10, pastel=True, scroll=False)
-    # game = GameMP4(width=1500, height=1500, cell_size=15, rules=rules, fps=2, run_seconds=1)
+    # rules = RainbowLife(num_states=5, pastel=True, scroll=False)
+    # game = GameMP4(width=800, height=800, cell_size=4, rules=rules, fps=10, run_seconds=1)
     # profiler = Profile()
     # profiler.runcall(game.run)
     # stats = Stats(profiler)
