@@ -5,6 +5,9 @@ class CellularAutomata:
         self.rows = rows
         self.cols = cols
         self.rules = rules
+        self.seed = self.rules.seed
+        # seed the grid
+        np.random.seed(self.seed)
         self.grid = np.random.choice(self.rules.possible_states, size=(rows, cols))
 
     def update(self):

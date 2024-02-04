@@ -7,6 +7,9 @@ import numpy as np
 
 class Rules:
     def __init__(self):
+        self.seed = random.randint(0, 100000) # Seed for the random number generator
+        random.seed(self.seed)
+        np.random.seed(self.seed)
         self.default_state = 0
         self.rules = {}
         self.possible_states = [0]
@@ -216,8 +219,12 @@ class RainbowLife(Rules):
     dx = np.array([-1, -1, -1, 0, 0, 1, 1, 1])
     dy = np.array([-1, 0, 1, -1, 1, -1, 0, 1])
     
-    def __init__(self, num_states=7, pastel=False, scroll=False):
+    def __init__(self, num_states=7, pastel=False, scroll=False, seed=None):
         super().__init__()
+        if seed is not None:
+            self.seed = seed
+            random.seed(self.seed)
+            np.random.seed(self.seed)
         self.colors = self.generate_colors(num_states, pastel=pastel)
         self.num_states = num_states
         self.possible_states = [i for i in range(len(self.colors))]
@@ -328,7 +335,11 @@ Explanation of the rules:
         return np.array([[self.get_state_color(state) for state in row] for row in grid])
 
 class RainbowLife2(RainbowLife):
-    """RainbowLife with a different set of principles than the first one."""
+    """RainbowLife with a different set of principles than the first one.
+    Notes:
+    - The equality_threshold parameter allows for a more flexible definition of "sameness".
+    - Larger number of states leads to smaller features in the color transitions.
+    """
     
     def __init__(self, equality_threshold=0, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -359,7 +370,7 @@ Rules:
 """
 
     @staticmethod
-    @lru_cache(maxsize=None)
+    @lru_cache(maxsize=1024)
     def _get_equals(state, equality_threshold, num_states):
         """Calculate the states considered equal to the current state based on the equality_threshold."""
         equals = []
@@ -370,19 +381,19 @@ Rules:
         return equals
     
     @staticmethod
-    @lru_cache(maxsize=None)
+    @lru_cache(maxsize=1024)
     def _equal_to_any(state, neighbors, equality_threshold, num_states):
         equals = RainbowLife2._get_equals(state, equality_threshold, num_states)
         return any(n in equals for n in neighbors)
     
     @staticmethod
-    @lru_cache(maxsize=None)
+    @lru_cache(maxsize=1024)
     def _equal_to_all(state, neighbors, equality_threshold, num_states):
         equals = RainbowLife2._get_equals(state, equality_threshold, num_states)
         return all(n in equals for n in neighbors)
     
     @staticmethod
-    @lru_cache(maxsize=None)
+    @lru_cache(maxsize=1024)
     def _average_state(neighbors):
         """Calculate the average state of the neighbors."""
         return sum(neighbors) // len(neighbors)

@@ -1,3 +1,4 @@
+import random
 import time
 import pygame
 from cellularautomata.ca import CellularAutomata
@@ -105,19 +106,23 @@ def main():
 
 
 if __name__ == "__main__":
+    seed = random.randint(0, 1000000)
+    print(f"Seed: {seed}")
+    random.seed(seed)
     # configuration
     width, height = 1000, 1000  # pixels
     # cells per row and column
-    num_cells = width // 5  # pixels per cell
+    num_cells = width // 10  # pixels per cell
     cell_size = width // num_cells
-    num_states = 100
+    num_states = 1000
     # % of the number of states that are considered equal to current state
-    percentage = 0
+    percentage = 0.02
     equality_threshold = int(num_states * percentage)
     fps = 30
     run_seconds = 60
 
     config = {
+        "seed": seed,
         "width": width,
         "height": height,
         "cell_size": cell_size,
@@ -129,6 +134,7 @@ if __name__ == "__main__":
     }
 
     rules = RainbowLife2(
+        seed=seed,
         num_states=num_states, 
         pastel=True, 
         scroll=False,
