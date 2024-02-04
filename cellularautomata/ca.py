@@ -12,4 +12,10 @@ class CellularAutomata:
         for i in range(self.rows):
             for j in range(self.cols):
                 new_grid[i, j] = self.rules.apply(self.grid, (i, j))
-        self.grid = new_grid
+        # check if the grid has changed
+        if not np.array_equal(new_grid, self.grid):
+            self.grid = new_grid
+            return True
+        # if the grid has not changed, stop the simulation
+        else:
+            return False

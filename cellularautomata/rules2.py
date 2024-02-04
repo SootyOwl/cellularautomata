@@ -334,26 +334,29 @@ class RainbowLife2(RainbowLife):
         super().__init__(*args, **kwargs)
         self.equality_threshold = equality_threshold
 
-    def __str__(self):
-        return """"RainbowLife 2 - The Reckoning"
-
-Rules:
-"""
-
     def get_next_state(self, state: int, neighbors: tuple):
-        # Move away from the previous implementation and use the new principles
-
         # If I'm not the same color as any of my neighbors, I choose the least common color among them
+        # "Ideas spread slowly, but they do spread."
         if not self._equal_to_any(state, neighbors, self.equality_threshold, self.num_states):
             return min(set(neighbors), key=neighbors.count)
         
         # If I'm the same color as all my neighbors, I change color
+        # "Nonconformity is the only legitimate form of rebellion."
         if self._equal_to_all(state, neighbors, self.equality_threshold, self.num_states):
             return (state + 1) % self.num_states
         
         # Otherwise, I choose the average color of my neighbors
+        # "The truth is in the middle."
         return self._average_state(neighbors)
         
+    def __str__(self):
+        return """RainbowLife2
+
+Rules:
+1. "Ideas spread slowly, but they do spread."
+2. "Nonconformity is the only legitimate form of rebellion."
+3. "The truth is in the middle."
+"""
 
     @staticmethod
     @lru_cache(maxsize=None)

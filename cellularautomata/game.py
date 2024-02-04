@@ -58,7 +58,9 @@ class Game:
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     running = False
-            self.ca.update()
+            if not self.ca.update():
+                # if the grid has not changed, stop the simulation early to save time
+                running = False
             self.renderer.draw(self.screen, self.ca)
             pygame.display.flip()
             pygame.time.delay(1000 // self.fps)
@@ -103,19 +105,34 @@ def main():
 
 
 if __name__ == "__main__":
+    # configuration
     width, height = 1000, 1000  # pixels
     # cells per row and column
-    num_cells = width // 20  # pixels per cell
+    num_cells = width // 5  # pixels per cell
     cell_size = width // num_cells
-    num_states = 50
+    num_states = 100
+    # % of the number of states that are considered equal to current state
+    percentage = 0
+    equality_threshold = int(num_states * percentage)
     fps = 30
     run_seconds = 60
+
+    config = {
+        "width": width,
+        "height": height,
+        "cell_size": cell_size,
+        "num_states": num_states,
+        "fps": fps,
+        "run_seconds": run_seconds,
+
+        "equality_threshold": equality_threshold,
+    }
 
     rules = RainbowLife2(
         num_states=num_states, 
         pastel=True, 
         scroll=False,
-        equality_threshold=5
+        equality_threshold=equality_threshold
     )
     game = GameMP4(
         width=width, 
@@ -138,23 +155,23 @@ if __name__ == "__main__":
     filename = f"{class_name}_{num_states}_{width}x{height}_{cell_size}px__{time.time()}.mp4"
     # rename the output file
     import os
+    import json
     # make a directory if it doesn't exist
     os.makedirs("videos", exist_ok=True)
     filename = os.path.join("videos", filename)
     os.rename("output.mp4", filename)
     # add a summary message
-    print(f"""{str(rules)}
+    summary = f"""{str(rules)}
 
-Settings:
-    width: {width}
-    height: {height}
-    cell_size: {cell_size}
-    num_states: {num_states}
-    fps: {fps}
-    run_seconds: {run_seconds}
-    filename: {filename}
-""")
+Configuration dict:
+{json.dumps(config, indent=2)}
 
+Video saved as {filename}
+"""
+    print(summary)
+    summary_filename = filename.replace(".mp4", ".txt")
+    with open(summary_filename, "w") as f:
+        f.write(summary)
     # main()
 
     # from cProfile import Profile
