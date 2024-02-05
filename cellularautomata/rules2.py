@@ -285,7 +285,7 @@ Explanation of the rules:
             return (state + 1) % self.num_states
         # If I'm different from all my neighbors, I change to the most common color among them
         # "When in Rome, do as the Romans do."
-        if self._different(state, neighbors):
+        if self._different_from_all(state, neighbors):
             return max(set(neighbors), key=neighbors.count)
         # otherwise, I choose an random neighbor to imitate
         # "Imitation is the sincerest form of flattery."
@@ -303,7 +303,7 @@ Explanation of the rules:
     
     @staticmethod
     @lru_cache(maxsize=None)
-    def _different(state, neighbors):
+    def _different_from_all(state, neighbors):
         return set(neighbors) - {state} == set(neighbors)   
     
     @staticmethod
@@ -338,7 +338,6 @@ class RainbowLife2(RainbowLife):
     """RainbowLife with a different set of principles than the first one.
     Notes:
     - The equality_threshold parameter allows for a more flexible definition of "sameness".
-    - Larger number of states leads to smaller features in the color transitions.
     """
     
     def __init__(self, equality_threshold=0, *args, **kwargs):
@@ -354,15 +353,18 @@ class RainbowLife2(RainbowLife):
         # If I'm the same color as all my neighbors, I change color
         # "Nonconformity is the only legitimate form of rebellion."
         if self._equal_to_all(state, neighbors, self.equality_threshold, self.num_states):
-            return (state + 1) % self.num_states
+            return (state + self.equality_threshold) % self.num_states
         
         # Otherwise, I choose the average color of my neighbors
         # "The truth is in the middle."
-        return self._average_state(neighbors)
+        return self._average_state(neighbors) % self.num_states
         
+
+    def __repr__(self):
+        return f"RainbowLife2(num_states={self.num_states}, equality_threshold={self.equality_threshold})"
+    
     def __str__(self):
         return """RainbowLife2
-
 Rules:
 1. "Ideas spread slowly, but they do spread."
 2. "Nonconformity is the only legitimate form of rebellion."
@@ -370,30 +372,55 @@ Rules:
 """
 
     @staticmethod
-    @lru_cache(maxsize=1024)
+    @lru_cache(maxsize=2**16)
     def _get_equals(state, equality_threshold, num_states):
         """Calculate the states considered equal to the current state based on the equality_threshold."""
         equals = []
         if equality_threshold == 0 or equality_threshold == 1:
             return [state]
         for i in range(-equality_threshold, equality_threshold + 1):
-            equals.append((state + i) % num_states)
+            # clamp the values to the range [0, num_states) but do not wrap around the range
+            if 0 <= (state + i) < num_states:
+                equals.append((state + i))
+            else:
+                continue  # skip the wrapping around the range
         return equals
     
     @staticmethod
-    @lru_cache(maxsize=1024)
+    @lru_cache(maxsize=2**16)
     def _equal_to_any(state, neighbors, equality_threshold, num_states):
         equals = RainbowLife2._get_equals(state, equality_threshold, num_states)
         return any(n in equals for n in neighbors)
     
     @staticmethod
-    @lru_cache(maxsize=1024)
+    @lru_cache(maxsize=2**16)
     def _equal_to_all(state, neighbors, equality_threshold, num_states):
         equals = RainbowLife2._get_equals(state, equality_threshold, num_states)
         return all(n in equals for n in neighbors)
     
     @staticmethod
-    @lru_cache(maxsize=1024)
+    @lru_cache(maxsize=2**16)
     def _average_state(neighbors):
         """Calculate the average state of the neighbors."""
         return sum(neighbors) // len(neighbors)
+    
+
+class RainbowLife3(RainbowLife2):
+    """RainbowLife3 with a different set of principles than the first one.
+    Notes:
+    - The equality_threshold parameter allows for a more flexible definition of "sameness".
+    - No longer sort the neighbors so we can use their relative positions.
+    """
+    
+    def __init__(self, equality_threshold=0, *args, **kwargs):
+        super().__init__(equality_threshold, *args, **kwargs)
+
+    def get_neighbors(self, grid: np.ndarray, position: tuple) -> tuple:
+        """Extract the 8 neighbors of a cell."""
+        rows, cols = grid.shape
+        nx, ny = self.get_neighbor_positions(position, rows, cols)
+        neighbors = grid[nx, ny]
+        return tuple(neighbors)
+    
+    def get_next_state(self, state: int, neighbors: tuple):
+        pass

@@ -41,7 +41,7 @@ class MP4Renderer(PygameRenderer):
 
 
 class Game:
-    def __init__(self, width=800, height=600, cell_size=10, rules=RainbowLife(), fps=10):
+    def __init__(self, width=800, height=600, cell_size=10, rules=RainbowLife(), fps=10, ca=None):
         pygame.init()
         self.width = width
         self.height = height
@@ -50,7 +50,10 @@ class Game:
         self.screen = pygame.display.set_mode((self.width, self.height))
         pygame.display.set_caption("Cellular Automata")
         rows, cols = self.height // cell_size, self.width // cell_size
-        self.ca = CellularAutomata(rows, cols, rules)
+        if ca is None:
+            self.ca = CellularAutomata(rows, cols, rules)
+        else:
+            self.ca = ca
         self.renderer = PygameRenderer(cell_size, rows, cols)
 
     def run(self):
@@ -69,10 +72,10 @@ class Game:
 
 
 class GameMP4(Game):
-    def __init__(self, width=800, height=600, cell_size=10, rules=RainbowLife(), fps=10, run_seconds=10):
-        super().__init__(width, height, cell_size, rules, fps)
+    def __init__(self, run_seconds=60, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         self.run_seconds = run_seconds
-        self.renderer = MP4Renderer(cell_size, (width, height), fps)
+        self.renderer = MP4Renderer(self.cell_size, (self.width, self.height), self.fps)
 
     def run(self):
         try:
