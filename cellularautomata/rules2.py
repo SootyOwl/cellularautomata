@@ -219,7 +219,7 @@ class RainbowLife(Rules):
     dx = np.array([-1, -1, -1, 0, 0, 1, 1, 1])
     dy = np.array([-1, 0, 1, -1, 1, -1, 0, 1])
     
-    def __init__(self, num_states=7, pastel=False, scroll=False, seed=None):
+    def __init__(self, num_states=7, pastel=False, scroll=False, seed=None, *args, **kwargs):
         super().__init__()
         if seed is not None:
             self.seed = seed
