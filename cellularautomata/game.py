@@ -87,14 +87,19 @@ class GameMP4(Game):
     def _run(self):
         running = True
         total_frames = self.run_seconds * self.fps
+        print(f"Running for {self.run_seconds} seconds, {total_frames} frames")
         while running and total_frames > 0:
             running, total_frames = self._run_one(total_frames)
+            # log the progress every 1% of the total frames
+            if total_frames % (self.fps * self.run_seconds // 100) == 0:
+                print(f"{total_frames / (self.fps * self.run_seconds) * 100:.0f}% done")
 
     def _run_one(self, total_frames):
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 return False, total_frames
-        self.ca.update()
+        if not self.ca.update():
+            return False, total_frames
         self.renderer.draw(self.screen, self.ca)
         pygame.display.flip()
         pygame.time.delay(1000 // self.fps)
