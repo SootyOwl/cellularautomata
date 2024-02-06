@@ -72,6 +72,8 @@ def output(game, ruleset, seed, width, height, cell_size, num_states, fps, run_s
     # generate a filename from configuration and rules class name
     rules_name = game.ca.rules.__class__.__name__
     filename = f"videos/{rules_name}_{seed}_{width}x{height}_{cell_size}_{num_states}_{fps}_{run_seconds}_{equality_threshold}_{time.time()}.mp4"
+    # create videos directory if it doesn't exist
+    os.makedirs("videos", exist_ok=True)
     os.rename("output.mp4", filename)
     click.echo(f"Saved to {filename}")
     summary(RULES[ruleset], filename, seed=seed, width=width, height=height, cell_size=cell_size, num_states=num_states, fps=fps, run_seconds=run_seconds, equality_threshold=equality_threshold)
